@@ -1,5 +1,8 @@
 fastapi
 uvicorn
 firebase-admin
-polars
+polars-lts-cpu
 numpy
+python-multipart
+firebase-functions
+nest-asyncio

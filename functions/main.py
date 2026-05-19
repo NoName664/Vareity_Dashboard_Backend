@@ -1,6 +1,10 @@
+import nest_asyncio
+nest_asyncio.apply()
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from firebase_functions import https_fn, options
 
 import json
 import gzip
@@ -38,13 +42,21 @@ def get_db():
     global firebase_app, db
 
     if db is None:
-
-        cred = credentials.Certificate("./account_key.json")
-
-        firebase_app = initialize_app(
-            cred,
-            {"storageBucket": "rcef-data.firebasestorage.app"}
-        )
+        # Check if running in production or local
+        if os.environ.get("FIREBASE_CONFIG"):
+            # Production
+            firebase_app = initialize_app()
+        else:
+            # Local / Emulator
+            try:
+                cred = credentials.Certificate("./account_key.json")
+                firebase_app = initialize_app(
+                    cred,
+                    {"storageBucket": "rcef-data.firebasestorage.app"}
+                )
+            except Exception:
+                # Fallback if file is missing
+                firebase_app = initialize_app()
 
         db = firestore.client()
 
@@ -828,9 +840,17 @@ async def get_all_users():
 # ==============================
 
 if __name__ == "__main__":
-
     import uvicorn
-
     port = int(os.environ.get("PORT", 8080))
-
     uvicorn.run(app, host="0.0.0.0", port=port)
+
+# ==============================
+# FIREBASE FUNCTIONS EXPORT
+# ==============================
+
+@https_fn.on_request(
+    timeout_sec=300, 
+    memory=options.MemoryOption.GB_1
+)
+def api(req: https_fn.Request) -> https_fn.Response:
+    return https_fn.handle_fastapi(app, req)
